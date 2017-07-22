@@ -10,42 +10,17 @@ namespace Minion
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MinionWindow : Window
     {
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool GetCursorPos(ref Win32Point pt);
 
-        [StructLayout(LayoutKind.Sequential)]
-        internal struct Win32Point
-        {
-            public Int32 X;
-            public Int32 Y;
-        };
-        public static Point GetMousePosition()
-        {
-            Win32Point w32Mouse = new Win32Point();
-            GetCursorPos(ref w32Mouse);
-            return new Point(w32Mouse.X, w32Mouse.Y);
-        }
 
-        public MainWindow()
+        public MinionWindow()
         {
             InitializeComponent();
             StartRoutine(update, () => TimeSpan.FromMilliseconds(16.666));
             StartRoutine(ChangeDirection, () => TimeSpan.FromSeconds(rnd.Next(1, 6)));
-            StartRoutine(ShowSpawner, () => TimeSpan.FromSeconds(rnd.Next(10, 30)));
             PortalSetup();
 
-        }
-        bool CanSpawnOthers = true;
-        public MainWindow(bool canSpawnOthers)
-        {
-            CanSpawnOthers = canSpawnOthers;
-            InitializeComponent();
-            StartRoutine(update, () => TimeSpan.FromMilliseconds(16.666));
-            StartRoutine(ChangeDirection, () => TimeSpan.FromSeconds(rnd.Next(1, 6)));
-            PortalSetup();
         }
 
         void PortalSetup()
@@ -60,33 +35,12 @@ namespace Minion
             portalRigth.Visibility = Visibility.Hidden;
         }
 
-        void ShowSpawner()
-        {
-            if (spawner != null) spawner.Close();
-            spawner = new SpawnerPortal();
-            spawner.Left = rnd.Next((int)(ScreenWidth - spawner.Width));
-            spawner.Top = rnd.Next((int)(ScreenHeight - ScreenHeight / 2));
-            spawner.Show();
-
-        }
-
-        void SpawnerUpdate()
-        {
-            if (spawner == null)
-                return;
-
-            if (spawner.Animating && CanSpawnOthers)
-            {
-                spawner.SpawnAnimation();
-            }
-        }
-        SpawnerPortal spawner;
         Portal portalLeft = new Portal("Portal2Blue.png");
         Portal portalRigth = new Portal("Portal2Red.png");
         static public double ScreenWidth = System.Windows.SystemParameters.PrimaryScreenWidth;
         static public double ScreenHeight = System.Windows.SystemParameters.PrimaryScreenHeight;
 
-        Random rnd = new Random();
+        static Random rnd = SpawnerPortal.rnd;
         public double posx = 20;
         public double posy = 20;
         const float gravity = 1.0f;
@@ -99,7 +53,6 @@ namespace Minion
 
         int lastDirection = 1;
         int direction = 1;
-        //int[] randomWalkDirections = new int[] { -1, 0, 1 };
         TranslateTransform translate = new TranslateTransform();
 
         enum AnimState
@@ -166,7 +119,6 @@ namespace Minion
             Animation();
             CheckForPortals();
             SpawnPortals();
-            SpawnerUpdate();
         }
 
         void CheckForPortals()
@@ -238,6 +190,22 @@ namespace Minion
 
         }
 
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetCursorPos(ref Win32Point pt);
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct Win32Point
+        {
+            public Int32 X;
+            public Int32 Y;
+        };
+        public static Point GetMousePosition()
+        {
+            Win32Point w32Mouse = new Win32Point();
+            GetCursorPos(ref w32Mouse);
+            return new Point(w32Mouse.X, w32Mouse.Y);
+        }
 
         void checkStearing()
         {
@@ -356,13 +324,15 @@ namespace Minion
 
         private void Window_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            isDragged = true;
-            DragMove();
-            posx = this.Left;
-            posy = this.Top;
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                isDragged = true;
+                DragMove();
+                posx = this.Left;
+                posy = this.Top;
 
-            isDragged = false;
-
+                isDragged = false;
+            }
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -405,7 +375,6 @@ namespace Minion
         {
             portalLeft.Close();
             portalRigth.Close();
-            if (spawner != null) spawner.Close();
         }
     }
 }
