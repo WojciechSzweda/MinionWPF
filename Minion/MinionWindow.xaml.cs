@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -20,7 +22,7 @@ namespace Minion
             InitializeComponent();
             this.lifetime = _lifetime * 30;
             StartRoutine(update, () => TimeSpan.FromMilliseconds(16.666));
-            StartRoutine(ChangeDirection, () => TimeSpan.FromSeconds(rnd.Next(1, 6)));
+            StartRoutine(ChangeDirection, () => TimeSpan.FromSeconds(rnd.Next(3, 6)));
             PortalSetup();
 
         }
@@ -42,7 +44,7 @@ namespace Minion
         public double posx = 20;
         public double posy = 20;
         public int lifetime;
-        const float gravity = 1.0f;
+        const float gravity = 0.6f;
         float accY = 0;
         float speed = 5f;
         int portalDist = 100;
@@ -50,6 +52,7 @@ namespace Minion
         bool isFalling = false;
         bool isDragged = false;
         bool isCloseToPortals = false;
+        bool isDying = false;
         bool closed = false;
         int lastDirection = 1;
         int direction = 1;
@@ -96,26 +99,29 @@ namespace Minion
         }
 
         int frameSize = 64;
-        State currentState = State.HURT;
-        AnimState currentAnimState = AnimState.HURT;
+        State currentState = State.SPELCASTING;
+        AnimState currentAnimState = AnimState.SPELLCAST_FRONT;
         int currentFrame = 0;
 
 
         void update()
         {
-            this.lifetime -= 1;
-            if (this.lifetime < 0)
+            if (isDying)
             {
-                this.Close();
+                Dying();
                 return;
             }
+            this.lifetime--;
+
+            CheckForDeath();
+
             if (isDragged) return;
             checkStearing();
             stearing();
             Move();
             WallCollision();
-            //ProcessesHandler();
             GravityInfluence();
+            WindowCollision();
             Dispatcher.Invoke(() =>
             {
                 this.Left = posx;
@@ -129,7 +135,9 @@ namespace Minion
 
         void CheckForPortals()
         {
-            if ((this.Left < portalDist && this.Top > ScreenHeight - 150) || (this.Left > ScreenWidth - (portalDist + this.Width) && this.Top > ScreenHeight - 150))
+            if ((this.Left < portalDist && this.Top > ScreenHeight - portalDist * 1.5)
+                || (this.Left > ScreenWidth - (portalDist + this.Width)
+                && this.Top > ScreenHeight - portalDist * 1.5))
             {
                 isCloseToPortals = true;
             }
@@ -139,10 +147,19 @@ namespace Minion
             }
         }
 
+        void CheckForDeath()
+        {
+            if (this.lifetime < 0)
+            {
+                currentFrame = 0;
+                isDying = true;
+                currentState = State.HURT;
+                currentAnimState = AnimState.HURT;
+            }
+        }
+
         void SpawnPortals()
         {
-
-
             if (isCloseToPortals)
             {
                 portalLeft.Visibility = Visibility.Visible;
@@ -163,6 +180,10 @@ namespace Minion
                 currentAnimState = AnimState.SPELLCAST_FRONT;
                 return;
             }
+            if (!isFalling && currentState == State.SPELCASTING)
+            {
+                currentState = State.WALKING;
+            }
             if (currentState == State.WALKING)
             {
                 if (direction > 0)
@@ -178,10 +199,6 @@ namespace Minion
                     currentAnimState = AnimState.WALK_FRONT;
                 }
             }
-            if (currentState == State.HURT)
-            {
-                currentAnimState = AnimState.HURT;
-            }
         }
 
 
@@ -196,21 +213,14 @@ namespace Minion
 
         }
 
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        internal static extern bool GetCursorPos(ref Win32Point pt);
-
-        [StructLayout(LayoutKind.Sequential)]
-        internal struct Win32Point
+        void Dying()
         {
-            public Int32 X;
-            public Int32 Y;
-        };
-        public static Point GetMousePosition()
-        {
-            Win32Point w32Mouse = new Win32Point();
-            GetCursorPos(ref w32Mouse);
-            return new Point(w32Mouse.X, w32Mouse.Y);
+            if (currentFrame == (int)currentState - 1)
+            {
+                this.Close();
+                return;
+            }
+            Animation();
         }
 
         void checkStearing()
@@ -255,28 +265,6 @@ namespace Minion
                 accY = 0;
                 isFalling = false;
             }
-            //for (int i = 0; i < procRect.Length; i++)
-            //{
-            //    if (posy > procRect[i].Top - this.Height + 20 && posy < procRect[i].Top + 10 && posx > procRect[i].Left && posx < procRect[i].Right && procRect[i].Top > 100)
-            //    {
-            //        posy = procRect[i].Top - this.Height + 20;
-            //        accY = 0;
-            //        isFalling = false;
-            //        break;
-            //    } 
-            //}
-
-            else if (posy > NotepadRect.Top - this.Height + 20 && posx > NotepadRect.Left && posx < NotepadRect.Right)
-            {
-                posy = NotepadRect.Top - this.Height + 20;
-                accY = 0;
-                isFalling = false;
-            }
-
-            currentState = State.WALKING;
-
-
-
         }
 
 
@@ -287,7 +275,6 @@ namespace Minion
             {
 
                 var chance = rnd.NextDouble();
-
 
                 if (chance < 0.6 || direction == 0)
                 {
@@ -311,6 +298,26 @@ namespace Minion
             else if (this.Left > ScreenWidth - this.Width)
             {
                 posx = 0;
+            }
+        }
+
+        void WindowCollision()
+        {
+            SHDocVw.ShellWindows shellWindows = new SHDocVw.ShellWindows();
+
+            foreach (SHDocVw.InternetExplorer ie in shellWindows)
+            {
+                var filename = Path.GetFileNameWithoutExtension(ie.FullName).ToLower();
+                if (filename.Equals("explorer"))
+                {
+                    if (this.Top >= ie.Top - this.Height && this.Top <= ie.Top && this.posx > ie.Left - this.Width / 2 && this.posx < ie.Left + ie.Width - this.Width / 2)
+                    {
+                        posy = ie.Top - this.Height;
+                        accY = 0;
+                        isFalling = false;
+                        return;
+                    }
+                }
             }
         }
 
@@ -344,47 +351,30 @@ namespace Minion
                 this.Close();
         }
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        public static extern IntPtr FindWindow(string strClassName, string strWindowName);
 
-        [DllImport("user32.dll")]
-        public static extern bool GetWindowRect(IntPtr hwnd, ref Rect rectangle);
-
-        public struct Rect
-        {
-            public int Left { get; set; }
-            public int Top { get; set; }
-            public int Right { get; set; }
-            public int Bottom { get; set; }
-        }
-        //Process[] processes;
-        //Process proc;
-        Rect NotepadRect;
-        //Rect[] procRect;
-        void ProcessesHandler()
-        {
-            //processes = Process.GetProcessesByName("notepad");
-            //proc = processes[0];
-            //IntPtr ptr = proc.MainWindowHandle;
-            //NotepadRect = new Rect();
-            //GetWindowRect(ptr, ref NotepadRect);
-
-            //processes = Process.GetProcesses();
-            //procRect = new Rect[processes.Length];
-            //for (int i = 0; i < processes.Length; i++)
-            //{
-            //    var ptr = processes[i].MainWindowHandle;
-            //    procRect[i] = new Rect();
-            //    GetWindowRect(ptr, ref procRect[i]);
-            //}
-
-        }
 
         private void Window_Closed(object sender, EventArgs e)
         {
             portalLeft.Close();
             portalRigth.Close();
             this.closed = true;
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool GetCursorPos(ref Win32Point pt);
+
+        [StructLayout(LayoutKind.Sequential)]
+        internal struct Win32Point
+        {
+            public Int32 X;
+            public Int32 Y;
+        };
+        public static Point GetMousePosition()
+        {
+            Win32Point w32Mouse = new Win32Point();
+            GetCursorPos(ref w32Mouse);
+            return new Point(w32Mouse.X, w32Mouse.Y);
         }
     }
 }

@@ -16,6 +16,7 @@ namespace Minion
         SkewTransform Skew;
         int maxMinionsAlive = 4;
         int minionLifetime = 60;
+
         int SkewIter = 0;
         double scaleStep = 0.025;
         double scaleStart = 0.1;
