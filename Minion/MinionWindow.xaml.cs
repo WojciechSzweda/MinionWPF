@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
@@ -14,9 +15,10 @@ namespace Minion
     {
 
 
-        public MinionWindow()
+        public MinionWindow(int _lifetime = 10)
         {
             InitializeComponent();
+            this.lifetime = _lifetime * 30;
             StartRoutine(update, () => TimeSpan.FromMilliseconds(16.666));
             StartRoutine(ChangeDirection, () => TimeSpan.FromSeconds(rnd.Next(1, 6)));
             PortalSetup();
@@ -29,10 +31,6 @@ namespace Minion
             portalLeft.Left = 0;
             portalRigth.Top = ScreenHeight - (portalRigth.Height + 20);
             portalRigth.Left = ScreenWidth - portalRigth.Width;
-            portalLeft.Show();
-            portalLeft.Visibility = Visibility.Hidden;
-            portalRigth.Show();
-            portalRigth.Visibility = Visibility.Hidden;
         }
 
         Portal portalLeft = new Portal("Portal2Blue.png");
@@ -43,14 +41,16 @@ namespace Minion
         static Random rnd = SpawnerPortal.rnd;
         public double posx = 20;
         public double posy = 20;
+        public int lifetime;
         const float gravity = 1.0f;
         float accY = 0;
         float speed = 5f;
+        int portalDist = 100;
         bool isStearing = false;
         bool isFalling = false;
         bool isDragged = false;
         bool isCloseToPortals = false;
-
+        bool closed = false;
         int lastDirection = 1;
         int direction = 1;
         TranslateTransform translate = new TranslateTransform();
@@ -103,12 +103,18 @@ namespace Minion
 
         void update()
         {
+            this.lifetime -= 1;
+            if (this.lifetime < 0)
+            {
+                this.Close();
+                return;
+            }
             if (isDragged) return;
             checkStearing();
             stearing();
             Move();
             WallCollision();
-            ProcessesHandler();
+            //ProcessesHandler();
             GravityInfluence();
             Dispatcher.Invoke(() =>
             {
@@ -123,7 +129,7 @@ namespace Minion
 
         void CheckForPortals()
         {
-            if ((this.Left < 150 && this.Top > ScreenHeight - 150) || (this.Left > ScreenWidth - 200 && this.Top > ScreenHeight - 150))
+            if ((this.Left < portalDist && this.Top > ScreenHeight - 150) || (this.Left > ScreenWidth - (portalDist + this.Width) && this.Top > ScreenHeight - 150))
             {
                 isCloseToPortals = true;
             }
@@ -318,6 +324,7 @@ namespace Minion
         async void StartRoutine(Action action, Func<TimeSpan> func)
         {
             await Task.Delay(func());
+            if (closed) return;
             action();
             StartRoutine(action, func);
         }
@@ -333,6 +340,8 @@ namespace Minion
 
                 isDragged = false;
             }
+            if (e.ChangedButton == MouseButton.Middle)
+                this.Close();
         }
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -375,6 +384,7 @@ namespace Minion
         {
             portalLeft.Close();
             portalRigth.Close();
+            this.closed = true;
         }
     }
 }

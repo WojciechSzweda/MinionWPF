@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Minion"
         mc:Ignorable="d"
         Title="SpawnerPortal" Height="200" Width="300" WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        ResizeMode="NoResize" Topmost="True">
+        ResizeMode="NoResize" Topmost="True" ShowInTaskbar="False">
     <Grid>
         <Image Name="PortalImage" Source="Portal2.png" RenderTransformOrigin="0.5,0.5" >
             <Image.RenderTransform>

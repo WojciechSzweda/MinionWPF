@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="64" Width="64"
         WindowStyle="None"
-        Background="Transparent" AllowsTransparency="True" ResizeMode="NoResize"
+        Background="Transparent" AllowsTransparency="True" ResizeMode="NoResize" ShowInTaskbar="False"
         MouseDown="Window_MouseDown"
         Topmost="True" Closed="Window_Closed"
         >

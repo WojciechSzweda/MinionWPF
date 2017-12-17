@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -10,8 +11,11 @@ namespace Minion
     /// </summary>
     public partial class SpawnerPortal : Window
     {
+        Queue<MinionWindow> Minions = new Queue<MinionWindow>();
         ScaleTransform Scale;
         SkewTransform Skew;
+        int maxMinionsAlive = 4;
+        int minionLifetime = 60;
         int SkewIter = 0;
         double scaleStep = 0.025;
         double scaleStart = 0.1;
@@ -29,7 +33,7 @@ namespace Minion
             Scale.ScaleX = scaleStart;
             Scale.ScaleY = scaleStart;
             Skew = new SkewTransform();
-            StartRoutine(ShowSpawner, () => TimeSpan.FromSeconds(rnd.Next(10, 30)));
+            StartRoutine(ShowSpawner, () => TimeSpan.FromSeconds(rnd.Next(30, 50)));
             StartRoutine(SpawnerUpdate, () => TimeSpan.FromMilliseconds(16.666));
             currentAnimation = IncreaseScaleAnimation;
 
@@ -44,6 +48,12 @@ namespace Minion
 
         void SpawnerUpdate()
         {
+            if (Minions.Count > maxMinionsAlive)
+            {
+                var minion = Minions.Dequeue();
+                minion.Close();
+            }
+
             if (Animating)
             {
                 currentAnimation();
@@ -93,17 +103,19 @@ namespace Minion
 
         void SpawnMinion()
         {
-            var minion = new MinionWindow();
+            var minion = new MinionWindow(minionLifetime);
             minion.posx = (this.Left + this.Width / 2) - minion.Width / 2;
             minion.Left = (this.Left + this.Width / 2) - minion.Width / 2;
             minion.posy = (this.Top + this.Height / 2);
             minion.Top = (this.Top + this.Height / 2);
             minion.Show();
+            Minions.Enqueue(minion);
         }
 
         async void StartRoutine(Action action, Func<TimeSpan> func)
         {
             await Task.Delay(func());
+
             action();
             StartRoutine(action, func);
         }
